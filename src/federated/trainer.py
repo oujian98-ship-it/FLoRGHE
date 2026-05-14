@@ -63,6 +63,9 @@ class FederatedTrainer:
         )
         write_json(ckpt_dir / "metrics.json", metrics)
         write_json(ckpt_dir / "comm.json", comm)
+        diagnostics = getattr(self.method, "last_diagnostics", None)
+        if diagnostics:
+            write_json(ckpt_dir / "diagnostics.json", diagnostics)
 
     def run(self):
         logs = []
@@ -114,8 +117,18 @@ class FederatedTrainer:
             self.method.set_state(self.global_model, self.global_state)
 
             eval_metrics = {}
-            if round_id % self.cfg.eval.every_round == 0:
-                eval_metrics = self.evaluator(self.global_model, self.eval_dataset, self.tokenizer, self.device, self.cfg)
+            should_eval = (
+                round_id % self.cfg.eval.every_round == 0
+                or round_id == self.cfg.federated.rounds
+            )
+            if should_eval:
+                eval_metrics = self.evaluator(
+                    self.global_model,
+                    self.eval_dataset,
+                    self.tokenizer,
+                    self.device,
+                    self.cfg,
+                )
 
             comm = self.method.communication(self.global_state, len(selected))
             round_log = {
