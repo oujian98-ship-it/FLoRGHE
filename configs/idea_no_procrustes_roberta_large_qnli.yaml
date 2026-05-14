@@ -1,0 +1,68 @@
+seed: 42
+method: idea_no_procrustes
+data:
+  root: D:/data
+task:
+  name: qnli
+  type: glue
+model:
+  name_or_path: roberta-large
+  task_type: sequence_classification
+  target_modules:
+  - query
+  - value
+  num_labels: 2
+  train_classifier_head: true
+  use_fast_tokenizer: true
+adapter:
+  type: hetero_lora
+  alpha: 16
+  dropout: 0.0
+  init_scale: 0.01
+  server_rank: 8
+aggregation:
+  space: delta_w
+  rank_weight_gamma: 0.5
+  procrustes: none
+  svd:
+    type: exact
+    eps: 1.0e-08
+    n_oversamples: 8
+    n_iter: 1
+hetero_rank:
+  mode: manual
+  weak_rank: 2
+  medium_rank: 4
+  strong_rank: 8
+  weak_ratio: 0.3
+  medium_ratio: 0.4
+  strong_ratio: 0.3
+  rank_candidates:
+  - 0
+  - 2
+  - 4
+  - 8
+  r_min_semantic: 4
+  semantic_layer_patterns: []
+federated:
+  num_clients: 20
+  participation_ratio: 1.0
+  rounds: 50
+  local_epochs: 1
+  non_iid:
+    type: dirichlet
+    alpha: 0.5
+    min_size: 1
+training:
+  lr: 5.0e-05
+  weight_decay: 0.0
+  batch_size: 4
+  max_seq_length: 128
+  optimizer: adamw
+  max_grad_norm: 1.0
+eval:
+  every_round: 1
+  batch_size: 64
+  metric: accuracy
+  debug_predictions: true
+output_dir: outputs/idea_no_procrustes_roberta_large_qnli
