@@ -23,15 +23,16 @@ adapter:
   type: hetero_lora
   alpha: 16
   dropout: 0.0
-  init_scale: 0.02
-  server_rank: 8
+  init_scale: 0.01
+  server_rank: 4
 
 aggregation:
   space: delta_w
   rank_weight_gamma: 0.0
   procrustes: prefix_safe
-  server_tau: 0.5
-  head_tau: 0.5
+  server_tau: 0.4
+  head_tau: 0.3
+  delta_clip_factor: 2.0
   svd:
     type: exact
     eps: 1.0e-08
@@ -39,16 +40,9 @@ aggregation:
     n_iter: 1
 
 hetero_rank:
-  mode: manual
-  weak_rank: 4
-  medium_rank: 4
-  strong_rank: 8
-  weak_ratio: 0.3
-  medium_ratio: 0.4
-  strong_ratio: 0.3
+  mode: homogeneous
   rank_candidates:
     - 4
-    - 8
   r_min_semantic: 4
   semantic_layer_patterns: []
 
@@ -61,11 +55,13 @@ federated:
     type: dirichlet
     alpha: 1.0
     min_size: 10
+    max_size_ratio: 10.0
     min_classes_per_client: 1
     max_tries: 5000
 
 training:
-  lr: 2.0e-5
+  lr: 5.0e-5
+  head_lr: 1.0e-5
   weight_decay: 0.0
   batch_size: 4
   max_seq_length: 128
@@ -78,4 +74,4 @@ eval:
   metric: accuracy
   debug_predictions: true
 
-output_dir: outputs/idea_acc_first_roberta_large_rte
+output_dir: outputs/idea_stable_rte

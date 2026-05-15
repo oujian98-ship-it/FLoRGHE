@@ -36,6 +36,10 @@ def get_device():
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+def pretrained_kwargs(cfg):
+    return {"local_files_only": bool(getattr(cfg.model, "local_files_only", False))}
+
+
 def build_partition(labels, cfg):
     partition_cfg = cfg.federated.non_iid
     partition_type = getattr(partition_cfg, "type", "dirichlet").lower()
@@ -81,6 +85,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(
         cfg.model.name_or_path,
         use_fast=getattr(cfg.model, "use_fast_tokenizer", True),
+        **pretrained_kwargs(cfg),
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -100,6 +105,7 @@ def main():
     probe_model = AutoModelForSequenceClassification.from_pretrained(
         cfg.model.name_or_path,
         num_labels=cfg.model.num_labels,
+        **pretrained_kwargs(cfg),
     )
     if tokenizer.pad_token is not None:
         probe_model.config.pad_token_id = tokenizer.pad_token_id
@@ -128,6 +134,7 @@ def main():
         model = AutoModelForSequenceClassification.from_pretrained(
             cfg.model.name_or_path,
             num_labels=cfg.model.num_labels,
+            **pretrained_kwargs(cfg),
         )
         if tokenizer.pad_token is not None:
             model.config.pad_token_id = tokenizer.pad_token_id

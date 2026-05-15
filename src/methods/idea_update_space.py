@@ -37,6 +37,41 @@ def compute_svd(matrix, rank, svd_type="exact", n_oversamples=8, n_iter=1):
 
 
 @torch.no_grad()
+def clip_deltas_by_median_norm(deltas, clip_factor=2.0, eps=1e-8):
+    """Clip client update matrices by the median update norm."""
+    if clip_factor is None or clip_factor <= 0:
+        return deltas
+    if not deltas:
+        return deltas
+
+    norms = torch.stack([torch.norm(delta).detach() for delta in deltas])
+    ref = norms.median().clamp_min(eps)
+    cap = float(clip_factor) * ref
+
+    clipped = []
+    for delta, norm in zip(deltas, norms):
+        scale = torch.clamp(cap / norm.clamp_min(eps), max=1.0)
+        clipped.append(delta * scale)
+    return clipped
+
+
+def ema_tensor_tree(prev_state, new_state, tau):
+    """Exponential moving average for nested tensor states."""
+    if not prev_state:
+        return new_state
+
+    tau = float(tau)
+    out = {}
+    for name, new_value in new_state.items():
+        if name not in prev_state:
+            out[name] = new_value
+            continue
+        prev_value = prev_state[name].to(dtype=new_value.dtype)
+        out[name] = ((1.0 - tau) * prev_value + tau * new_value).cpu()
+    return out
+
+
+@torch.no_grad()
 def aggregate_idea_one_layer(
     client_layer_states,
     prev_global,
@@ -47,6 +82,8 @@ def aggregate_idea_one_layer(
     svd_type="exact",
     n_oversamples=8,
     n_iter=1,
+    delta_clip_factor=2.0,
+    server_tau=1.0,
     eps=1e-8,
 ):
     valid = [s for s in client_layer_states if int(s["rank"]) > 0]
@@ -76,12 +113,25 @@ def aggregate_idea_one_layer(
         deltas.append(scale * (B @ A))
         weights_raw.append(n * (r ** gamma))
 
+    deltas = clip_deltas_by_median_norm(
+        deltas,
+        clip_factor=delta_clip_factor,
+        eps=eps,
+    )
+
     weights_raw = torch.tensor(weights_raw, device=device, dtype=torch.float32)
     weights = weights_raw / weights_raw.sum().clamp_min(eps)
 
     delta_bar = torch.zeros(dout, din, device=device, dtype=torch.float32)
     for w, delta in zip(weights, deltas):
         delta_bar += w * delta
+
+    server_tau = float(server_tau)
+    if server_tau < 1.0:
+        B_prev_full = prev_global["B_eff"].to(device=device, dtype=torch.float32)
+        A_prev_full = prev_global["A_eff"].to(device=device, dtype=torch.float32)
+        delta_prev = B_prev_full @ A_prev_full
+        delta_bar = (1.0 - server_tau) * delta_prev + server_tau * delta_bar
 
     svd_start = time.time()
     U, S, Vh = compute_svd(
@@ -160,6 +210,8 @@ def aggregate_idea_states(
     svd_type="exact",
     n_oversamples=8,
     n_iter=1,
+    delta_clip_factor=2.0,
+    server_tau=1.0,
 ):
     next_state = {}
     for layer_name, prev_global in prev_global_state.items():
@@ -176,6 +228,8 @@ def aggregate_idea_states(
             svd_type=svd_type,
             n_oversamples=n_oversamples,
             n_iter=n_iter,
+            delta_clip_factor=delta_clip_factor,
+            server_tau=server_tau,
         )
     return next_state
 
@@ -206,6 +260,9 @@ class IdeaUpdateSpaceMethod:
         aggregation_cfg = getattr(cfg, "aggregation", None)
         self.gamma = float(getattr(aggregation_cfg, "rank_weight_gamma", 0.5))
         self.procrustes = procrustes or getattr(aggregation_cfg, "procrustes", "full")
+        self.delta_clip_factor = float(getattr(aggregation_cfg, "delta_clip_factor", 2.0))
+        self.server_tau = float(getattr(aggregation_cfg, "server_tau", 1.0))
+        self.head_tau = float(getattr(aggregation_cfg, "head_tau", self.server_tau))
         svd_cfg = getattr(aggregation_cfg, "svd", None)
         self.svd_type = getattr(svd_cfg, "type", "exact")
         self.svd_n_oversamples = int(getattr(svd_cfg, "n_oversamples", 8))
@@ -308,13 +365,20 @@ class IdeaUpdateSpaceMethod:
             svd_type=self.svd_type,
             n_oversamples=self.svd_n_oversamples,
             n_iter=self.svd_n_iter,
+            delta_clip_factor=self.delta_clip_factor,
+            server_tau=self.server_tau,
         )
 
         if self.cfg.model.train_classifier_head:
             weights = torch.tensor([float(cs.get("__num_samples__", 1.0)) for cs in client_states], dtype=torch.float32)
-            next_state["__classifier_head__"] = weighted_average_tensor_tree(
+            new_head = weighted_average_tensor_tree(
                 [cs["__classifier_head__"] for cs in client_states],
                 weights,
+            )
+            next_state["__classifier_head__"] = ema_tensor_tree(
+                prev_global_state.get("__classifier_head__", {}),
+                new_head,
+                self.head_tau,
             )
         else:
             next_state["__classifier_head__"] = prev_global_state.get("__classifier_head__", {})

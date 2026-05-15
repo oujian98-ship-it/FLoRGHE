@@ -1,4 +1,4 @@
-seed: 42
+seed: 43
 method: idea_update_space
 
 data:
@@ -53,7 +53,7 @@ federated:
     min_size: 1
 
 training:
-  lr: 5.0e-5
+  lr: 0.0001
   weight_decay: 0.0
   batch_size: 4
   max_seq_length: 128

@@ -26,12 +26,38 @@ class ClientTrainer:
     def train(self, model, round_id=None, show_progress=True):
         model.to(self.device)
         model.train()
-        trainable_params = [p for p in model.parameters() if p.requires_grad]
-        optimizer = torch.optim.AdamW(
-            trainable_params,
-            lr=self.cfg.training.lr,
-            weight_decay=self.cfg.training.weight_decay,
-        )
+
+        adapter_params = []
+        head_params = []
+        for name, p in model.named_parameters():
+            if not p.requires_grad:
+                continue
+            if "classifier" in name or "score" in name:
+                head_params.append(p)
+            else:
+                adapter_params.append(p)
+
+        head_lr = float(getattr(self.cfg.training, "head_lr", self.cfg.training.lr))
+        param_groups = []
+        if adapter_params:
+            param_groups.append(
+                {
+                    "params": adapter_params,
+                    "lr": self.cfg.training.lr,
+                    "weight_decay": self.cfg.training.weight_decay,
+                }
+            )
+        if head_params:
+            param_groups.append(
+                {
+                    "params": head_params,
+                    "lr": head_lr,
+                    "weight_decay": self.cfg.training.weight_decay,
+                }
+            )
+
+        trainable_params = adapter_params + head_params
+        optimizer = torch.optim.AdamW(param_groups)
         loader = self.make_loader()
         total_loss = 0.0
         steps = 0
