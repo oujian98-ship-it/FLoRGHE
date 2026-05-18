@@ -1,11 +1,11 @@
 seed: 43
-method: idea_prefix_safe
+method: idea_update_space
 
 data:
   root: D:/data
 
 task:
-  name: wnli
+  name: qnli
   type: glue
 
 model:
@@ -17,6 +17,7 @@ model:
   num_labels: 2
   train_classifier_head: true
   use_fast_tokenizer: true
+  local_files_only: true
 
 adapter:
   type: hetero_lora
@@ -29,9 +30,6 @@ aggregation:
   space: delta_w
   rank_weight_gamma: 0.5
   procrustes: full
-
-  server_tau: 0.7
-  head_tau: 1.0
   svd:
     type: exact
     eps: 1.0e-8
@@ -52,15 +50,11 @@ federated:
   local_epochs: 1
   non_iid:
     type: dirichlet
-    alpha: 1.0
-    min_size: 2
-    min_classes_per_client: 1
-    max_size_ratio: 20.0
-    max_tries: 5000
+    alpha: 0.5
+    min_size: 1
 
 training:
   lr: 5.0e-5
-  head_lr: 5.0e-5
   weight_decay: 0.0
   batch_size: 4
   max_seq_length: 128
@@ -73,4 +67,4 @@ eval:
   metric: accuracy
   debug_predictions: true
 
-output_dir: outputs/idea_update_space_roberta_large_wnli_homogeneous
+output_dir: outputs/idea_update_space_roberta_large_qnli_homogeneous

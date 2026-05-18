@@ -17,6 +17,17 @@ GLUE_KEYS = {
     "wnli": ("sentence1", "sentence2"),
 }
 
+EXPECTED_NUM_LABELS = {
+    "cola": 2,
+    "sst2": 2,
+    "mrpc": 2,
+    "qqp": 2,
+    "mnli": 3,
+    "qnli": 2,
+    "rte": 2,
+    "wnli": 2,
+}
+
 LOCAL_SPLITS = {
     "rte": {"train": "train.tsv", "validation": "dev.tsv", "test": "test.tsv"},
     "wnli": {"train": "train.tsv", "validation": "dev.tsv", "test": "test.tsv"},
@@ -52,6 +63,12 @@ def _task_dir(task_name, data_root):
 def _read_local_split(path, task_name):
     df = pd.read_csv(path, sep="\t", quoting=3)
     task_name = task_name.lower()
+    if task_name == "mnli":
+        df = df.rename(columns={"sentence1": "premise", "sentence2": "hypothesis"})
+    key1, key2 = GLUE_KEYS[task_name]
+    for key in (key1, key2):
+        if key is not None and key in df.columns:
+            df[key] = df[key].fillna("").astype(str)
     if "gold_label" in df.columns:
         df = df.rename(columns={"gold_label": "label"})
     if "label" in df.columns:
@@ -62,6 +79,23 @@ def _read_local_split(path, task_name):
         df = df.dropna(subset=["labels"])
         df["labels"] = df["labels"].astype("int64")
     return Dataset.from_pandas(df, preserve_index=False)
+
+
+def expected_num_labels(task_name):
+    task_name = task_name.lower()
+    if task_name not in EXPECTED_NUM_LABELS:
+        raise ValueError(f"Unsupported GLUE task for label validation: {task_name}")
+    return EXPECTED_NUM_LABELS[task_name]
+
+
+def validate_task_num_labels(task_name, num_labels):
+    expected = expected_num_labels(task_name)
+    actual = int(num_labels)
+    if actual != expected:
+        raise ValueError(
+            f"Invalid num_labels for task={task_name}: got {actual}, expected {expected}. "
+            "MNLI is a 3-class task; RTE/WNLI/QNLI/MRPC are 2-class tasks."
+        )
 
 
 def load_local_glue_dataset(task_name, tokenizer, max_seq_length, data_root=None):

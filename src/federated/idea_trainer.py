@@ -34,6 +34,7 @@ class IdeaFederatedTrainer:
         cfg,
         device,
         evaluator,
+        resume_checkpoint=None,
     ):
         self.global_model_fn = global_model_fn
         self.client_model_fn = client_model_fn
@@ -48,6 +49,11 @@ class IdeaFederatedTrainer:
 
         self.global_model = global_model_fn().to(device)
         self.global_state = method.init_global_state(self.global_model)
+        self.start_round = 1
+        if resume_checkpoint is not None:
+            checkpoint = torch.load(resume_checkpoint, map_location="cpu")
+            self.global_state = checkpoint["state"]
+            self.start_round = int(checkpoint["round"]) + 1
         self.method.bind_shape_state_for_comm(self.global_state)
         self.method.set_global_state(self.global_model, self.global_state)
 
@@ -81,7 +87,7 @@ class IdeaFederatedTrainer:
     def run(self):
         logs = []
         round_iter = tqdm(
-            range(1, self.cfg.federated.rounds + 1),
+            range(self.start_round, self.cfg.federated.rounds + 1),
             desc="idea federated rounds",
             dynamic_ncols=True,
         )
@@ -148,8 +154,10 @@ class IdeaFederatedTrainer:
             svd_time = sum(float(v.get("server_svd_time_sec", 0.0)) for v in diagnostics.values())
             proc_time = sum(float(v.get("procrustes_time_sec", 0.0)) for v in diagnostics.values())
 
+            eval_log = {f"eval_{k}": v for k, v in eval_metrics.items()}
             round_log = {
                 "round": round_id,
+                **eval_log,
                 "method": self.method.name,
                 "model": self.cfg.model.name_or_path,
                 "task": self.cfg.task.name,
@@ -168,7 +176,6 @@ class IdeaFederatedTrainer:
                 "trunc_error_mean": sum(trunc_errors) / len(trunc_errors) if trunc_errors else None,
                 "trunc_error_max": max(trunc_errors) if trunc_errors else None,
                 "train_time_sec": train_time,
-                **{f"eval_{k}": v for k, v in eval_metrics.items()},
             }
             logs.append(round_log)
             append_jsonl(self.log_path, round_log)

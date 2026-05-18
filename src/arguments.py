@@ -49,4 +49,5 @@ def parse_run_args():
     parser.add_argument("--method", default=None)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument("--resume-checkpoint", default=None)
     return parser.parse_args()

@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.arguments import load_config, parse_run_args
-from src.datasets.glue import load_glue_dataset
+from src.datasets.glue import load_glue_dataset, validate_task_num_labels
 from src.datasets.partition import client_label_stats, dirichlet_partition, iid_partition
 from src.eval.glue_eval import evaluate_glue
 from src.federated.idea_trainer import IdeaFederatedTrainer
@@ -74,6 +74,7 @@ def main():
     if args.output_dir is not None:
         overrides["output_dir"] = args.output_dir
     cfg = load_config(args.config, overrides)
+    validate_task_num_labels(cfg.task.name, cfg.model.num_labels)
     set_seed(cfg.seed)
 
     device = get_device()
@@ -163,6 +164,7 @@ def main():
         cfg=cfg,
         device=device,
         evaluator=evaluate_glue,
+        resume_checkpoint=args.resume_checkpoint,
     )
     trainer.run()
 

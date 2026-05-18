@@ -24,7 +24,7 @@ if LOCAL_DEPS.exists() and str(LOCAL_DEPS) not in sys.path:
     sys.path.insert(0, str(LOCAL_DEPS))
 
 from src.arguments import load_config, parse_run_args
-from src.datasets.glue import load_glue_dataset
+from src.datasets.glue import load_glue_dataset, validate_task_num_labels
 from src.datasets.partition import client_label_stats, dirichlet_partition
 from src.eval.glue_eval import evaluate_glue
 from src.federated.trainer import FederatedTrainer
@@ -51,6 +51,7 @@ def main():
     if args.output_dir is not None:
         overrides["output_dir"] = args.output_dir
     cfg = load_config(args.config, overrides)
+    validate_task_num_labels(cfg.task.name, cfg.model.num_labels)
     set_seed(cfg.seed)
     device = get_device()
     if device.type == "cuda":

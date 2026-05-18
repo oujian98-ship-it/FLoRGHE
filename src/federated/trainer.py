@@ -131,8 +131,10 @@ class FederatedTrainer:
                 )
 
             comm = self.method.communication(self.global_state, len(selected))
+            eval_log = {f"eval_{k}": v for k, v in eval_metrics.items()}
             round_log = {
                 "round": round_id,
+                **eval_log,
                 "method": self.method.name,
                 "model": self.cfg.model.name_or_path,
                 "task": self.cfg.task.name,
@@ -145,7 +147,6 @@ class FederatedTrainer:
                 "total_comm_params": comm["total"],
                 "server_agg_time_sec": agg_time,
                 "train_time_sec": train_time,
-                **{f"eval_{k}": v for k, v in eval_metrics.items()},
             }
             logs.append(round_log)
             append_jsonl(self.log_path, round_log)
