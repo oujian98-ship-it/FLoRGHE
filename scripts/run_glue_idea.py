@@ -98,7 +98,13 @@ def main():
         data_root=getattr(getattr(cfg, "data", None), "root", None),
     )
     train_dataset = encoded["train"]
-    eval_dataset = encoded["validation_matched"] if cfg.task.name.lower() == "mnli" else encoded["validation"]
+    if cfg.task.name.lower() == "mnli":
+        eval_dataset = {
+            "matched": encoded["validation_matched"],
+            "mismatched": encoded["validation_mismatched"],
+        }
+    else:
+        eval_dataset = encoded["validation"]
     labels = [int(x["labels"]) for x in train_dataset]
     client_indices = build_partition(labels, cfg)
     write_json(Path(cfg.output_dir) / "client_stats.json", client_label_stats(labels, client_indices))

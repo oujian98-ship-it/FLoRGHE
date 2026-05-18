@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from transformers import DataCollatorWithPadding
 
 
-def evaluate_glue(model, dataset, tokenizer, device, cfg):
+def _evaluate_one_split(model, dataset, tokenizer, device, cfg):
     task_name = cfg.task.name.lower()
     metric = evaluate.load("glue", task_name)
     loader = DataLoader(
@@ -54,3 +54,14 @@ def evaluate_glue(model, dataset, tokenizer, device, cfg):
             result["per_class_accuracy"][str(label)] = float(correct / total) if total else 0.0
 
     return result
+
+
+def evaluate_glue(model, dataset, tokenizer, device, cfg):
+    if isinstance(dataset, dict):
+        out = {}
+        for split_name, split_dataset in dataset.items():
+            split_metrics = _evaluate_one_split(model, split_dataset, tokenizer, device, cfg)
+            for key, value in split_metrics.items():
+                out[f"{split_name}_{key}"] = value
+        return out
+    return _evaluate_one_split(model, dataset, tokenizer, device, cfg)
