@@ -63,5 +63,10 @@ def evaluate_glue(model, dataset, tokenizer, device, cfg):
             split_metrics = _evaluate_one_split(model, split_dataset, tokenizer, device, cfg)
             for key, value in split_metrics.items():
                 out[f"{split_name}_{key}"] = value
+        if "matched_accuracy" in out and "mismatched_accuracy" in out:
+            out = {
+                "accuracy": (out["matched_accuracy"] + out["mismatched_accuracy"]) / 2.0,
+                **out,
+            }
         return out
     return _evaluate_one_split(model, dataset, tokenizer, device, cfg)

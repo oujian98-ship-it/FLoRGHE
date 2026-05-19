@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from io import StringIO
 from pathlib import Path
 
 import pandas as pd
@@ -16,7 +17,9 @@ def main():
     log_paths = list(Path(args.root).glob("**/*.log")) + list(Path(args.root).glob("**/rounds.jsonl"))
     log_paths = [p for p in log_paths if p.parent.name == "logs"]
     for path in log_paths:
-        frames.append(pd.read_json(path, lines=True))
+        content = "\n".join(line for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
+        if content:
+            frames.append(pd.read_json(StringIO(content), lines=True))
     if not frames:
         raise SystemExit(f"No rounds.log or rounds.jsonl files found under {args.root}")
     df = pd.concat(frames, ignore_index=True)

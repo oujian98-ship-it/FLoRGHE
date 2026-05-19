@@ -11,11 +11,12 @@ def ensure_dir(path: str | Path) -> Path:
     return p
 
 
-def append_jsonl(path: str | Path, row: dict[str, Any]) -> None:
+def append_jsonl(path: str | Path, row: dict[str, Any], blank_line: bool = False) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(row, ensure_ascii=True) + "\n")
+        ending = "\n\n" if blank_line else "\n"
+        f.write(json.dumps(row, ensure_ascii=True) + ending)
 
 
 def write_json(path: str | Path, obj: Any) -> None:

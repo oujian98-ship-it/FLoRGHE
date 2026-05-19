@@ -9,6 +9,7 @@ import torch
 from tqdm.auto import tqdm
 
 from src.arguments import namespace_to_dict
+from src.datasets.partition import client_label_stats
 from src.federated.client import ClientTrainer
 from src.logging_utils import append_jsonl, ensure_dir, write_json
 from src.methods.idea_rank_allocator import rank_distribution
@@ -43,6 +44,7 @@ class IdeaFederatedTrainer:
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.client_indices = client_indices
+        self.train_labels = [int(row["labels"]) for row in train_dataset]
         self.cfg = cfg
         self.device = device
         self.evaluator = evaluator
@@ -164,6 +166,10 @@ class IdeaFederatedTrainer:
                 "seed": self.cfg.seed,
                 "run_id": self.run_id,
                 "selected_clients": selected,
+                "selected_client_label_stats": [
+                    stat for stat in client_label_stats(self.train_labels, self.client_indices)
+                    if stat["client_id"] in selected
+                ],
                 "rank_distribution": rank_distribution(self.method.rank_map, selected),
                 "client_loss": sum(x["loss"] for x in client_logs) / max(1, len(client_logs)),
                 "client_loss_std": float(torch.tensor([x["loss"] for x in client_logs]).std(unbiased=False).item()),
@@ -178,7 +184,7 @@ class IdeaFederatedTrainer:
                 "train_time_sec": train_time,
             }
             logs.append(round_log)
-            append_jsonl(self.log_path, round_log)
+            append_jsonl(self.log_path, round_log, blank_line=True)
             self.save_checkpoint(round_id, eval_metrics, comm)
 
             round_iter.set_postfix(

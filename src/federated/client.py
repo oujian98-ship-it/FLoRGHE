@@ -37,14 +37,16 @@ class ClientTrainer:
             else:
                 adapter_params.append(p)
 
-        head_lr = float(getattr(self.cfg.training, "head_lr", self.cfg.training.lr))
+        lr = float(self.cfg.training.lr)
+        head_lr = float(getattr(self.cfg.training, "head_lr", lr))
+        weight_decay = float(getattr(self.cfg.training, "weight_decay", 0.0))
         param_groups = []
         if adapter_params:
             param_groups.append(
                 {
                     "params": adapter_params,
-                    "lr": self.cfg.training.lr,
-                    "weight_decay": self.cfg.training.weight_decay,
+                    "lr": lr,
+                    "weight_decay": weight_decay,
                 }
             )
         if head_params:
@@ -52,7 +54,7 @@ class ClientTrainer:
                 {
                     "params": head_params,
                     "lr": head_lr,
-                    "weight_decay": self.cfg.training.weight_decay,
+                    "weight_decay": weight_decay,
                 }
             )
 
