@@ -50,10 +50,10 @@ federated:
   non_iid:
     type: dirichlet
     alpha: 0.5
-    min_label1_per_client: 2
+    min_size: 1
 
 training:
-  lr: 5e-5
+  lr: 5.0e-5
   weight_decay: 0.0
   batch_size: 4
   max_seq_length: 128

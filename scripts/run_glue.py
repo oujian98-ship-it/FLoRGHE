@@ -116,6 +116,7 @@ def main():
         cfg=cfg,
         device=device,
         evaluator=evaluate_glue,
+        submission_dataset=encoded,
     )
     trainer.run()
 

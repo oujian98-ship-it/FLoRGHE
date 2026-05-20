@@ -10,6 +10,7 @@ from tqdm.auto import tqdm
 
 from src.arguments import namespace_to_dict
 from src.datasets.partition import client_label_stats
+from src.eval.glue_submission import write_glue_test_predictions
 from src.federated.client import ClientTrainer
 from src.logging_utils import append_jsonl, ensure_dir, write_json
 
@@ -26,6 +27,7 @@ class FederatedTrainer:
         cfg,
         device,
         evaluator,
+        submission_dataset=None,
     ):
         self.model_fn = model_fn
         self.method = method
@@ -37,6 +39,9 @@ class FederatedTrainer:
         self.cfg = cfg
         self.device = device
         self.evaluator = evaluator
+        self.submission_dataset = submission_dataset
+        self.best_submission_accuracy = None
+        self.best_submission_round = None
         self.global_model = model_fn().to(device)
         self.global_state = method.get_state(self.global_model)
         self.output_dir = ensure_dir(cfg.output_dir)
@@ -131,9 +136,40 @@ class FederatedTrainer:
                     self.device,
                     self.cfg,
                 )
+                eval_accuracy = eval_metrics.get("accuracy")
+                if (
+                    self.submission_dataset is not None
+                    and eval_accuracy is not None
+                    and (
+                        self.best_submission_accuracy is None
+                        or float(eval_accuracy) > self.best_submission_accuracy
+                    )
+                ):
+                    self.best_submission_accuracy = float(eval_accuracy)
+                    self.best_submission_round = int(round_id)
+                    written = write_glue_test_predictions(
+                        model=self.global_model,
+                        encoded_dataset=self.submission_dataset,
+                        tokenizer=self.tokenizer,
+                        device=self.device,
+                        cfg=self.cfg,
+                        output_root="glue_submit",
+                    )
+                    write_json(
+                        Path("glue_submit") / Path(self.cfg.output_dir).name / "best_submission.json",
+                        {
+                            "round": self.best_submission_round,
+                            "eval_accuracy": self.best_submission_accuracy,
+                            "files": [str(path) for path in written],
+                        },
+                    )
 
             comm = self.method.communication(self.global_state, len(selected))
             eval_log = {f"eval_{k}": v for k, v in eval_metrics.items()}
+            all_client_label_stats = client_label_stats(self.train_labels, self.client_indices)
+            selected_client_label_stats = [
+                stat for stat in all_client_label_stats if stat["client_id"] in selected
+            ]
             round_log = {
                 "round": round_id,
                 **eval_log,
@@ -143,10 +179,7 @@ class FederatedTrainer:
                 "seed": self.cfg.seed,
                 "run_id": self.run_id,
                 "selected_clients": selected,
-                "selected_client_label_stats": [
-                    stat for stat in client_label_stats(self.train_labels, self.client_indices)
-                    if stat["client_id"] in selected
-                ],
+                "selected_client_label_stats": selected_client_label_stats,
                 "client_loss": sum(x["loss"] for x in client_logs) / max(1, len(client_logs)),
                 "upload_params": comm["upload"],
                 "download_params": comm["download"],

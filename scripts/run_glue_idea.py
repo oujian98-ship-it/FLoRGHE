@@ -22,7 +22,11 @@ if str(ROOT) not in sys.path:
 
 from src.arguments import load_config, parse_run_args
 from src.datasets.glue import load_glue_dataset, validate_task_num_labels
-from src.datasets.partition import client_label_stats, dirichlet_partition, iid_partition
+from src.datasets.partition import (
+    client_label_stats,
+    dirichlet_partition,
+    iid_partition,
+)
 from src.eval.glue_eval import evaluate_glue
 from src.federated.idea_trainer import IdeaFederatedTrainer
 from src.logging_utils import write_json
@@ -171,6 +175,7 @@ def main():
         device=device,
         evaluator=evaluate_glue,
         resume_checkpoint=args.resume_checkpoint,
+        submission_dataset=encoded,
     )
     trainer.run()
 

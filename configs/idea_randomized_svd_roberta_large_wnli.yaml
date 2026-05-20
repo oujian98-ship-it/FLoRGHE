@@ -1,11 +1,11 @@
 seed: 42
-method: idea_prefix_safe
+method: idea_update_space
 
 data:
   root: D:/data
 
 task:
-  name: rte
+  name: wnli
   type: glue
 
 model:
@@ -17,32 +17,37 @@ model:
   num_labels: 2
   train_classifier_head: true
   use_fast_tokenizer: true
-  local_files_only: true
 
 adapter:
   type: hetero_lora
   alpha: 16
   dropout: 0.0
   init_scale: 0.01
-  server_rank: 4
+  server_rank: 8
 
 aggregation:
   space: delta_w
-  rank_weight_gamma: 0.0
-  procrustes: prefix_safe
-  server_tau: 0.4
-  head_tau: 0.3
-  delta_clip_factor: 2.0
+  rank_weight_gamma: 0.5
+  procrustes: full
   svd:
-    type: exact
-    eps: 1.0e-08
+    type: randomized
+    eps: 1.0e-8
     n_oversamples: 8
     n_iter: 1
 
 hetero_rank:
-  mode: homogeneous
+  mode: manual
+  weak_rank: 2
+  medium_rank: 4
+  strong_rank: 8
+  weak_ratio: 0.3
+  medium_ratio: 0.4
+  strong_ratio: 0.3
   rank_candidates:
+    - 0
+    - 2
     - 4
+    - 8
   r_min_semantic: 4
   semantic_layer_patterns: []
 
@@ -53,15 +58,11 @@ federated:
   local_epochs: 1
   non_iid:
     type: dirichlet
-    alpha: 1.0
-    min_size: 10
-    max_size_ratio: 10.0
-    min_classes_per_client: 1
-    max_tries: 5000
+    alpha: 0.5
+    min_size: 1
 
 training:
   lr: 5.0e-5
-  head_lr: 1.0e-5
   weight_decay: 0.0
   batch_size: 4
   max_seq_length: 128
@@ -74,4 +75,4 @@ eval:
   metric: accuracy
   debug_predictions: true
 
-output_dir: outputs/idea_stable_rte
+output_dir: outputs/idea_randomized_svd_roberta_large_wnli

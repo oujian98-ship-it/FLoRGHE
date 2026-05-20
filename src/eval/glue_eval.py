@@ -32,14 +32,31 @@ def _evaluate_one_split(model, dataset, tokenizer, device, cfg):
         preds = torch.argmax(logits, dim=-1)
         metric.add_batch(predictions=preds.cpu(), references=labels.cpu())
 
-        if debug_predictions:
-            pred_list = [int(x) for x in preds.cpu().tolist()]
-            label_list = [int(x) for x in labels.cpu().tolist()]
-            pred_counter.update(pred_list)
-            label_counter.update(label_list)
-            pair_counter.update((label, pred) for label, pred in zip(label_list, pred_list))
+        pred_list = [int(x) for x in preds.cpu().tolist()]
+        label_list = [int(x) for x in labels.cpu().tolist()]
+        pred_counter.update(pred_list)
+        label_counter.update(label_list)
+        pair_counter.update((label, pred) for label, pred in zip(label_list, pred_list))
 
     result = metric.compute()
+
+    recalls = []
+    f1s = []
+    labels_seen = sorted(label_counter)
+    for label in labels_seen:
+        tp = pair_counter.get((label, label), 0)
+        fn = label_counter.get(label, 0) - tp
+        fp = pred_counter.get(label, 0) - tp
+        recall = tp / (tp + fn) if (tp + fn) else 0.0
+        precision = tp / (tp + fp) if (tp + fp) else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+        recalls.append(recall)
+        f1s.append(f1)
+
+    if recalls:
+        result["balanced_accuracy"] = float(sum(recalls) / len(recalls))
+    if f1s:
+        result["macro_f1"] = float(sum(f1s) / len(f1s))
 
     if debug_predictions:
         result["pred_counts"] = {str(k): int(v) for k, v in sorted(pred_counter.items())}

@@ -146,5 +146,11 @@ def load_glue_dataset(task_name, tokenizer, max_seq_length, data_root=None):
     local = load_local_glue_dataset(task_name, tokenizer, max_seq_length, data_root)
     if local is not None:
         return local
+    if data_root is not None:
+        raise FileNotFoundError(
+            f"Local GLUE dataset for task={task_name} was not found under data_root={data_root}. "
+            "Because data.root is set, the loader will not fall back to Hugging Face. "
+            "Check the task directory and expected TSV file names."
+        )
     raw = load_dataset("glue", task_name.lower())
     return _tokenize_glue_dataset(raw, task_name, tokenizer, max_seq_length)

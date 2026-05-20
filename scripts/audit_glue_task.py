@@ -13,7 +13,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.arguments import load_config
-from src.datasets.partition import dirichlet_partition, iid_partition, client_label_stats
+from src.datasets.partition import (
+    client_label_stats,
+    dirichlet_partition,
+    iid_partition,
+)
 
 
 LABEL_MAPS = {
